@@ -2,6 +2,7 @@ package IRCClient;
 use strict;
 use warnings;
 use IO::Socket::INET;
+use Data::Dumper;
 
 sub new
 {
@@ -10,10 +11,9 @@ sub new
 		_socket => 0,
 		_connected => 0,
 		_active_session => 0,
-		_nick_lists => undef,
-		_recv_buf => '',
+		_nick_lists => {},
 		_callbacks => {},
-		_lines => '',
+		_lines => [],
 		_wait_until => 0,
 		_server_address => $addr,
 		_server_port => $port,
@@ -29,11 +29,11 @@ sub new
 			'PING' => \&_on_ping,
 			'PRIVMSG' => \&_on_privmsg,
 			'NOTICE' => \&_on_notice,
-			'ERROR' => \&_on_error,
+			'ERROR' => sub { return; },
 			#'353' => '',
 			#'366' => '',
-			#'372' => '',
-			'376' => \&_on_connected,
+			'372' => sub { return; },
+			'376' => sub { return; },
 			'001' => \&_on_connected
 		}
 	};
@@ -45,11 +45,12 @@ sub new
 ## ARGS: event, Source, target, args
 sub _on_ping
 {
-	my ($self, $reply) = @_;
-	if (defined($reply))
+	my ($self, $reply) = ($_[0], $_[3]);
+	warn Dumper($reply);
+	if ($reply)
 	{
 		$self->log_line("[PING] $reply");
-		$self->send("PONG $reply");
+		$self->send("PONG :$reply");
 	}
 }
 sub _on_privmsg
@@ -196,13 +197,13 @@ sub log_line {
 sub tick {
 	my $self = $_[0];
 	my $retn = 0;
-	my $line = '';
-	my $errmsg = '';
-	if ($self->{_wait_until} && $self->{_wait_until} > time()) { return 0; }
+	my $tmp_buf = undef;
+	my @tmp_lines = undef;
+	my $line = undef;
 	
 	if ($self->{_connected})
 	{
-		$line = readline($self->{_socket});
+		$tmp_buf = readline($self->{_socket});
 		if ($!) {
 			print "[ERROR] $!";
 			$self->{_connected} = undef;
@@ -210,29 +211,41 @@ sub tick {
 			return -1;
 		}
 		
-		chomp($line);
+		push(@{$self->{_lines}}, split(/\r\n/, $tmp_buf));
 		
-		$self->log_line($line);
+		#warn Dumper(@{$self->{_lines}});
 		
-		if ($line =~ /^(:([^  ]+))?[   ]*([^  ]+)[  ]+:?([^  ]*)[   ]*:?(.*)$/)
+		while (@{$self->{_lines}})
 		{
-			#my ($source, $event, $target, $args) = ($2, $3, $4, $5);
-			if (exists($self->{_event_handlers}{$3}))
+			$line = pop(@{$self->{_lines}});
+			if ($line =~ /^(:([^  ]+))?[   ]*([^  ]+)[  ]+:?([^  ]*)[   ]*:?(.*)$/)
 			{
-				$self->{_event_handlers}{$3}->($self,$3,$2,$4,$5);
+				#my ($source, $event, $target, $args) = ($2, $3, $4, $5);
+				if (exists($self->{_event_handlers}{$3}))
+				{
+					if ($3 eq 'PING')
+					{
+						$self->{_event_handlers}{'PING'}->($self, $3, $4);
+					}
+					else
+					{
+						$self->{_event_handlers}{$3}->($self, $3, $2, $4, $5);	
+					}
+				}
 			}
 		}
-		elsif ($line =~ /^PING (:.+)$/)
-		{
-			if (exists($self->{_event_handlers}{'on_ping'}))
-			{
-				$self->{_event_handlers}{'on_ping'}->($self,$1);
-			}
-		}
+		#elsif ($line =~ /^PING :(.+)$/)
+		#{
+		#	if (exists($self->{_event_handlers}{'on_ping'}))
+		#	{
+		#		$self->{_event_handlers}{'on_ping'}->($self,$2);
+		#	}
+		#}
+		# Clear this
+		$line = '';
 	} 
 	else
 	{
-		print "Connecting...";
 		if ($self->connect() == 1)
 		{
 			$self->send("USER $self->{_username} * * :$self->{_realname}");
