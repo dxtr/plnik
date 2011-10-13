@@ -1,32 +1,30 @@
 package Autojoin;
 use Data::Dumper;
 
-my $bot = undef;
-
 sub autojoin
 {
-    print "Hello from on_connected in Autojoin!";
-	foreach (@{$bot->{settings}{channels}})
+    my $bot = $_[0];
+    print "Hello from on_connected in Autojoin!\n";
+    foreach (@{$bot->{_settings}->{channels}})
 	{
-        print "Joining channel $_[0]...";
-		IRCBot::join($bot, $_[0], $_[1])
+        warn Dumper($_);
+        print "Joining channel $_->[0]...\n";
+		$bot->join($_->[0], $_->[1])
 	}
 }
 
 
 sub _init
 {
-	$bot = $_[1];
-    warn Dumper(@_);
-	if ($bot)
+    my $bot = $_[1];
+    my $aj = \&autojoin;
+	if ($bot && $aj)
 	{
 		print "Hello from Autojoin!";
-		warn Dumper($bot);
-        my $test = \&autojoin;
-        warn Dumper($test);
-        $bot->add_callback("on_connected", \&autojoin);
+        $bot->add_callback("on_connected", $aj);
 		return 1;
 	}
+    warn Dumper($aj);
 	return 0;
 }
 

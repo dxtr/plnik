@@ -74,22 +74,16 @@ sub new
 
 sub add_callback
 {
-    my ($self, $args) = @_;
-    warn Dumper($args);
-    die unless $self->SUPER::add_callback($args);
-}
-
-sub _init
-{
-    #my ($self, $settings) = @_;
-    #$self->SUPER::_init($settings
+    my ($self, $event, $cb) = @_;
+    die unless $self->SUPER::add_callback($event, $cb);
 }
 
 # wrappers around ircclient
 sub join
 {
     my ($self, $channel, $key) = @_;
-    $self->join($channel, $key);
+    print "joining channel $channel...\n";
+    $self->SUPER::join($channel, $key);
 }
 
 1;

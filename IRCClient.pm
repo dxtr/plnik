@@ -16,7 +16,7 @@ sub new
         _callbacks => {},
         _lines => [],
         _send_queue => [],
-        _wait_until => 0,
+        _wait_until => time(),
         _settings => $settings,
         _event_handlers => {
             'JOIN' => \&_on_join,
@@ -27,12 +27,25 @@ sub new
             'PING' => \&_on_ping,
             'PRIVMSG' => \&_on_privmsg,
             'NOTICE' => \&_on_notice,
+            'MODE' => sub { return; },
             'ERROR' => sub { return; },
             '353' => sub { return; },
             '366' => sub { return; },
             '372' => sub { return; },
             '376' => sub { return; },
-            '001' => \&_on_connected
+            '001' => \&_on_connected,
+            '002' => sub { return; },
+            '003' => sub { return; },
+            '004' => sub { return; },
+            '005' => sub { return; },
+            '251' => sub { return; },
+            '252' => sub { return; },
+            '254' => sub { return; },
+            '255' => sub { return; },
+            '265' => sub { return; },
+            '266' => sub { return; },
+            '422' => sub { return; },
+
         }
     };
     bless $self, $class;
@@ -47,10 +60,12 @@ sub join
     {
         if ($key)
         {
+            print("Joining $channel with key $key\n");
             $self->queue_msg("JOIN $channel $key");
         }
         else
         {
+            print("Joining $channel\n");
             $self->queue_msg("JOIN $channel");
         }
     }
@@ -58,12 +73,11 @@ sub join
 
 sub _on_ping
 {
-    my ($self, $reply) = @_;
-    warn Dumper($reply);
-    if ($reply)
+    my ($self, $args) = @_;
+    if (%{$args})
     {
-        $self->log_line("[PING] $reply");
-        $self->send("PONG :$reply");
+        $self->log_line("[$args->{event}] $args->{reply}");
+        $self->_send("PONG :$args->{reply}");
     }
 }
 sub _on_privmsg
@@ -72,10 +86,10 @@ sub _on_privmsg
     if (defined($event) && defined($src) && defined($target) && defined($text))
     {
         $self->log_line("[PRIVMSG] $src -> $target: $text");
-        if ($self->{_callbacks}{'on_privmsg'})
+        if ($self->{_callbacks}{on_privmsg})
         {
-            foreach ($self->{_callbacks}{'on_privmsg'})
-                { $_->($self, $src, $target, $text); }
+            foreach ($self->{_callbacks}{on_privmsg})
+                { ${$_}->($self, $src, $target, $text); }
         }
     }
 }
@@ -91,35 +105,37 @@ sub _on_error
 
 sub _on_notice
 {
-    my ($self, $event, $src, $target, $text) = @_;
-    if (defined($event) && defined($src) && defined($target) && defined($text))
+    my ($self, $args) = @_;
+    if (%{$args})
     {
-        $self->log_line("[NOTICE] $src -> $target: $text");
-        if ($self->{_callbacks}{'on_notice'})
+        if (!$args->{'text'})
         {
-            foreach ($self->{_callbacks}{'on_notice'})
-                { $_->($self, $src, $target, $text); }
+            $self->log_line("[$args->{'event'}] $args->{'source'} -> $args->{'target'}");
+        }
+        else
+        {
+            $self->log_line("[$args->{'event'}] $args->{'source'} -> $args->{'target'}: $args->{'text'}");
+        }
+
+        if ($self->{_callbacks}{on_notice})
+        {
+            foreach ($self->{_callbacks}{on_notice})
+                { $_->($self, $args); }
         }
     }
 }
 sub _on_connected
 {
-    my ($self, $event, $server) = @_;
-    warn Dumper(@_);
-    warn Dumper($self);
-    warn Dumper($self->{_callbacks});
-    print "In _on_connected";
-    if (defined($event) && defined($server))
+    my ($self, $args) = @_;
+    if (%{$args})
     {
-        $self->log_line("[CONNECTED] $server");
-        if ($self->{_callbacks}->{'on_connected'})
+        $self->log_line("[CONNECTED] $args->{source}");
+        if ($self->{_callbacks}->{on_connected})
         {
-            print "Found an on_connected callback...";
-            foreach (@{$self->{_callbacks}->{'on_connected'}})
+            print "Found an on_connected callback...\n";
+            foreach (@{$self->{_callbacks}->{on_connected}})
             {
-                warn Dumper($_);
-                { $_->($self, $server); }
-        
+                $_->($self, $args);
             }
         }
     }
@@ -183,7 +199,6 @@ sub connect {
     return 1;
 
     fail:
-    warn Dumper($self->{_settings});
     $self->log_line("[ERROR] Can't connect to $self->{_settings}->{servers}->[0]! $!");
     return 0;
 }
@@ -200,7 +215,7 @@ sub _send
 sub queue_msg
 {
     my ($self, $msg) = @_;
-    push(@{$self->{send_queue}}, $msg);
+    push(@{$self->{_send_queue}}, $msg);
 }
 
 sub is_connected
@@ -219,52 +234,97 @@ sub log_line {
     print "[" . time() . "] ($self->{_settings}->{nickname}) $line\n" if $line;
 }
 
+sub recv
+{
+    my $self = $_[0];
+    my $buf = readline($self->{_socket});
+    if ($!)
+    {
+        $self->log_line("ERROR! $!");
+        $self->{_connected} = undef;
+        $self->{_socket}->close();
+        return -1;
+    }
+
+    push(@{$self->{_lines}}, split(/\r\n/, $buf)) if $buf;
+}
+
+sub parse_line
+{
+    my $self = $_[0];
+    if ($self->{_connected})
+    {
+        my $line = pop(@{$self->{_lines}});
+        if ($line =~ /^(:([^  ]+))?[   ]*([^  ]+)[  ]+:?([^  ]*)[   ]*:?(.*)$/)
+        {
+            if ($3 eq "PING")
+            {
+                return({'event' => $3, 'response' => $4});
+            }
+            else
+            {
+                return({'event' => $3, 'source' => $2, 'target' => $4, 'message' => $5});
+            }
+        }
+    }
+    return 0;
+}
+
+sub handle_event
+{
+    my ($self, $ircmsg) = @_;
+
+    if (%{$ircmsg})
+    {
+        if ($self->{_event_handlers}{$ircmsg->{event}})
+        {
+            $self->{_event_handlers}{$ircmsg->{event}}->($self, $ircmsg);
+        }
+        else
+        {
+            $self->log_line("Unhandled event: $ircmsg->{event}");
+        }
+    }
+}
+
 sub tick {
     my $self = $_[0];
     my $retn = 0;
     my $tmp_buf = undef;
     my @tmp_lines = undef;
     my $line = undef;
-    
+    my $irc_message = undef;
+
     if ($self->{_connected})
     {
-        $tmp_buf = readline($self->{_socket});
-        if ($!) {
-            print "[ERROR] $!";
-            $self->{_connected} = undef;
-            $self->{_socket}->close();
-            return -1;
-        }
-        
-        push(@{$self->{_lines}}, split(/\r\n/, $tmp_buf)) if ($tmp_buf);
-        
-        #warn Dumper(@{$self->{_lines}});
-        
+        # Recieve some data
+        $self->recv();
+
+        # Parse the entire queue while we're at it
         while (@{$self->{_lines}})
         {
-            $line = pop(@{$self->{_lines}});
-            if ($line =~ /^(:([^  ]+))?[   ]*([^  ]+)[  ]+:?([^  ]*)[   ]*:?(.*)$/)
+            $irc_message = $self->parse_line();
+            if (!%{$irc_message})
             {
-                #my ($source, $event, $target, $args) = ($2, $3, $4, $5);
-                if ($self->{_event_handlers}{$3})
-                {
-                    if ($3 eq 'PING')
-                    {
-                        $self->{_event_handlers}{'PING'}->($self, $4);
-                    }
-                    else
-                    {
-                        $self->{_event_handlers}{$3}->($self, $3, $2, $4, $5);  
-                    }
-                }
+                print "Couldn't parse a message from the server\n";
+            }
+
+            $self->handle_event($irc_message);
+        }
+
+        # Send away a message
+        #print "Waiting until: $self->{_wait_until} (now: " . time() . ")\n";
+        if ($self->{_send_queue})
+        {
+            if ($self->{_wait_until} <= time() && $self->{_send_queue})
+            {
+                $self->_send(pop(@{$self->{_send_qeue}}));
+                $self->{_wait_until} = time()+2;
             }
         }
-        
-        # Send away a message
-        if ($self->{_wait_until} <= time() && @{$self->{_send_queue}})
+        else
         {
-            $self->_send(pop(@{$self->{_send_qeue}}));
-            $self->{_wait_until} = time()+2;
+            print "Send queue is empty!\n";
         }
     } 
     else
@@ -275,15 +335,13 @@ sub tick {
             $self->_send("NICK $self->{_settings}->{nickname}");
         }
     }
-    
+
     return 1;
 }
 
 sub add_callback
 {
     my ($self, $event, $callback) = @_;
-    warn Dumper(@_);
-    warn Dumper($callback);
     return 0 unless $event && $callback;
     
     if (!$self->{_callbacks}->{$event} || ref($self->{_callbacks}->{$event}) ne "ARRAY")
@@ -293,7 +351,6 @@ sub add_callback
     
     push(@{$self->{_callbacks}->{$event}}, $callback);
     print "Added callback!";
-    die;
     return 1;
 }
 
