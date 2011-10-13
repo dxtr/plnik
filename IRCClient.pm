@@ -60,12 +60,10 @@ sub join
     {
         if ($key)
         {
-            print("Joining $channel with key $key\n");
             $self->queue_msg("JOIN $channel $key");
         }
         else
         {
-            print("Joining $channel\n");
             $self->queue_msg("JOIN $channel");
         }
     }
@@ -76,20 +74,20 @@ sub _on_ping
     my ($self, $args) = @_;
     if (%{$args})
     {
-        $self->log_line("[$args->{event}] $args->{reply}");
-        $self->_send("PONG :$args->{reply}");
+        $self->log_line("[$args->{event}] $args->{response}");
+        $self->_send("PONG :$args->{response}");
     }
 }
 sub _on_privmsg
 {
-    my ($self, $event, $src, $target, $text) = @_;
-    if (defined($event) && defined($src) && defined($target) && defined($text))
+    my ($self, $args) = @_;
+    if (%{$args})
     {
-        $self->log_line("[PRIVMSG] $src -> $target: $text");
+        $self->log_line("[$args->{event}] $args->{source} -> $args->{target}: $args->{message}");
         if ($self->{_callbacks}{on_privmsg})
         {
             foreach ($self->{_callbacks}{on_privmsg})
-                { ${$_}->($self, $src, $target, $text); }
+                { $_->($self, $args); }
         }
     }
 }
@@ -215,7 +213,9 @@ sub _send
 sub queue_msg
 {
     my ($self, $msg) = @_;
+
     push(@{$self->{_send_queue}}, $msg);
+    warn Dumper($self->{_send_queue});
 }
 
 sub is_connected
@@ -313,18 +313,15 @@ sub tick {
         }
 
         # Send away a message
-        #print "Waiting until: $self->{_wait_until} (now: " . time() . ")\n";
-        if ($self->{_send_queue})
+        if (@{$self->{_send_queue}})
         {
-            if ($self->{_wait_until} <= time() && $self->{_send_queue})
+            if ($self->{_wait_until} <= time() && @{$self->{_send_queue}})
             {
-                $self->_send(pop(@{$self->{_send_qeue}}));
+                my $sendmsg = pop(@{$self->{_send_queue}});
+                warn Dumper($sendmsg);
+                $self->_send($sendmsg);
                 $self->{_wait_until} = time()+2;
             }
-        }
-        else
-        {
-            print "Send queue is empty!\n";
         }
     } 
     else
