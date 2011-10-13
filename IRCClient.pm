@@ -7,7 +7,7 @@ use utf8;
 
 sub new
 {
-    my ($class, $addr, $port, $nick, $username, $realname) = @_;
+    my ($class, $settings) = @_;
     my $self = {
         _socket => 0,
         _connected => 0,
@@ -17,11 +17,7 @@ sub new
         _lines => [],
         _send_queue => [],
         _wait_until => 0,
-        _server_address => $addr,
-        _server_port => $port,
-        _nickname => $nick,
-        _username => $username,
-        _realname => $realname,
+        _settings => $settings,
         _event_handlers => {
             'JOIN' => \&_on_join,
             'KICK' => \&_on_kick,
@@ -32,8 +28,8 @@ sub new
             'PRIVMSG' => \&_on_privmsg,
             'NOTICE' => \&_on_notice,
             'ERROR' => sub { return; },
-            #'353' => '',
-            #'366' => '',
+            '353' => sub { return; },
+            '366' => sub { return; },
             '372' => sub { return; },
             '376' => sub { return; },
             '001' => \&_on_connected
@@ -60,8 +56,6 @@ sub join
     }
 }
 
-# Message handlers
-## ARGS: event, Source, target, args
 sub _on_ping
 {
     my ($self, $reply) = @_;
@@ -111,13 +105,22 @@ sub _on_notice
 sub _on_connected
 {
     my ($self, $event, $server) = @_;
+    warn Dumper(@_);
+    warn Dumper($self);
+    warn Dumper($self->{_callbacks});
+    print "In _on_connected";
     if (defined($event) && defined($server))
     {
         $self->log_line("[CONNECTED] $server");
-        if ($self->{_callbacks}{'on_connected'})
+        if ($self->{_callbacks}->{'on_connected'})
         {
-            foreach ($self->{_callbacks}{'on_connected'})
+            print "Found an on_connected callback...";
+            foreach (@{$self->{_callbacks}->{'on_connected'}})
+            {
+                warn Dumper($_);
                 { $_->($self, $server); }
+        
+            }
         }
     }
 }
@@ -169,24 +172,20 @@ sub _on_nick
 
 sub connect {
     my $self = $_[0];
-    my $errmsg = '';
     $self->{_socket} = IO::Socket::INET->new(Proto => 'tcp',
                                 Timeout => 30,
                                 Type => SOCK_STREAM, 
-                                PeerAddr => $self->{_server_address},
-                                PeerPort => $self->{_server_port},
+                                PeerAddr => $self->{_settings}->{servers}->[0],
+                                PeerPort => $self->{_settings}->{port},
                                 Blocking => 1)
-                                or $errmsg = "[ERROR] $!";
-    if ($errmsg)
-    {
-        $self->log_line("Can't connect to $self->{_server_address}! $errmsg");
-        return 0;
-    }
-    else
-    {
-        $self->{_connected} = 1;
-        return 1;
-    }
+                                or goto fail;
+    $self->{_connected} = 1;
+    return 1;
+
+    fail:
+    warn Dumper($self->{_settings});
+    $self->log_line("[ERROR] Can't connect to $self->{_settings}->{servers}->[0]! $!");
+    return 0;
 }
 
 sub _send
@@ -217,7 +216,7 @@ sub idle {
 
 sub log_line {
     my ($self, $line) = @_;
-    print "[" . time() . "] ($self->{_nickname}) $line\n" if $line;
+    print "[" . time() . "] ($self->{_settings}->{nickname}) $line\n" if $line;
 }
 
 sub tick {
@@ -272,8 +271,8 @@ sub tick {
     {
         if ($self->connect() == 1)
         {
-            $self->_send("USER $self->{_username} * * :$self->{_realname}");
-            $self->_send("NICK $self->{_nickname}");
+            $self->_send("USER $self->{_settings}->{username} * * :$self->{_settings}->{realname}");
+            $self->_send("NICK $self->{_settings}->{nickname}");
         }
     }
     
@@ -283,11 +282,19 @@ sub tick {
 sub add_callback
 {
     my ($self, $event, $callback) = @_;
+    warn Dumper(@_);
+    warn Dumper($callback);
+    return 0 unless $event && $callback;
     
-    if (!$self->{_callbacks}{$event})
+    if (!$self->{_callbacks}->{$event} || ref($self->{_callbacks}->{$event}) ne "ARRAY")
     {
-        $self->{_callbacks}{$event} = $callback;
+        $self->{_callbacks}->{$event} = []
     }
+    
+    push(@{$self->{_callbacks}->{$event}}, $callback);
+    print "Added callback!";
+    die;
+    return 1;
 }
 
 1;
