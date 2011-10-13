@@ -1,6 +1,4 @@
-use lib '..';
 package Autojoin;
-use IRCBot;
 use Data::Dumper;
 
 my $bot = undef;
