@@ -9,9 +9,12 @@ use Data::Dumper;
 sub _on_connected
 {
     my ($self) = $_[0];
-    foreach (@{$self->{plugins}})
+    warn Dumper($self->{_callbacks});
+    warn Dumper($self->{_client}{_callbacks});
+    return 0 unless $self->{_callbacks}{on_connected} && ref($self->{_callbacks}{on_connected}) eq "ARRAY";
+    foreach (@{$self->{_callbacks}{on_connected}})
     {
-        
+        $_->($self);
     }
 }
 sub _on_join
@@ -50,16 +53,17 @@ sub new
     my $self = {
         _client => IRCClient->new($settings->{servers}[0], $settings->{port}, $settings->{nickname}, $settings->{username} || $settings->{nickname}, $settings->{realname} || $settings->{nickname}),
         _plugins => [],
+        _callbacks => {},
         _settings => $settings
     };
     
-    $self->{_client}->add_callback('on_connected', \&_on_connected);
-    $self->{_client}->add_callback('on_join', \&_on_join);
-    $self->{_client}->add_callback('on_nick_change', \&_on_nick_change);
-    $self->{_client}->add_callback('on_notice', \&_on_notice);
-    $self->{_client}->add_callback('on_part', \&_on_part);
-    $self->{_client}->add_callback('on_privmsg', \&_on_privmsg);
-    $self->{_client}->add_callback('on_quit', \&_on_quit);
+    IRCClient::add_callback($self->{_client},'on_connected', \&_on_connected);
+    IRCClient::add_callback($self->{_client},'on_join', \&_on_join);
+#$self->{_client}->add_callback('on_nick_change', \&_on_nick_change);
+#    $self->{_client}->add_callback('on_notice', \&_on_notice);
+#    $self->{_client}->add_callback('on_part', \&_on_part);
+#    $self->{_client}->add_callback('on_privmsg', \&_on_privmsg);
+#    $self->{_client}->add_callback('on_quit', \&_on_quit);
     bless $self, $class;
     
     if ($self->{_settings}->{modules})
@@ -90,8 +94,15 @@ sub join
 sub add_callback
 {
     my ($self, $event, $cb) = @_;
-    warn Dumper(@_);
-    $self->{_client}->add_callback($event, $cb);
+    print "Adding callback $event...";
+    if ($self->{_callbacks}{$event} && ref($self->{_callbacks}{$event}) ne "ARRAY")
+    {
+        $self->{_callbacks}{$event} = [$cb];
+    }
+    else
+    {
+        push(@{$self->{_callbacks}{$event}}, $cb);
+    }
 }
 
 sub is_connected

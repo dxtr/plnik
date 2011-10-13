@@ -15,7 +15,7 @@ sub load_module
 	if ($@) { print $@; return 0; }
 	
 	push(@{$bot->{_plugins}}, $file);
-	${file11111111111111111111111111111111111111111111111111111111}->_init($bot);
+	$file->_init($bot);
 	return $file;
 }
 

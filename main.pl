@@ -15,10 +15,9 @@ while (<SETTINGSFILE>)
 close SETTINGSFILE;
 $settings = JSON::decode_json($json);
 
-
+# Create the bot
 my $client = IRCBot->new($settings);
 
-#my $client = plnik->new();
 while (1)
 {
 	my $i = $client->tick();
