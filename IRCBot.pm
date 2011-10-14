@@ -2,7 +2,7 @@ package IRCBot;
 use strict;
 use warnings;
 use IRCClient;
-use Plugins::Handler;
+use lib::Handler;
 use utf8;
 use Data::Dumper;
 
@@ -58,13 +58,14 @@ sub new
     {
         foreach (@{$self->{_settings}->{modules}})
         {
-            if (Handler::load_module($self, $_))
+            my $mod = $_;
+            if (Handler::load_module($self, $mod))
             {
-                print "Loaded module $_!";
+                print "Loaded module $mod!";
             }
             else
             {
-                print "Couldn't load module $_!";
+                print "Couldn't load module $mod!";
             }
         }
     }
@@ -75,6 +76,7 @@ sub new
 sub add_callback
 {
     my ($self, $event, $cb) = @_;
+    warn Dumper(@_);
     die unless $self->SUPER::add_callback($event, $cb);
 }
 
@@ -84,6 +86,12 @@ sub join
     my ($self, $channel, $key) = @_;
     print "joining channel $channel...\n";
     $self->SUPER::join($channel, $key);
+}
+
+sub privmsg
+{
+    my ($self, $target, $message);
+    $self->SUPER::primsg($target, $message);
 }
 
 1;

@@ -9,6 +9,7 @@ sub new
 {
     my ($class, $settings) = @_;
     my $self = {
+        running => 1,
         _socket => 0,
         _connected => 0,
         _active_session => 0,
@@ -69,6 +70,15 @@ sub join
     }
 }
 
+sub privmsg
+{
+    my ($self, $target, $message) = @_;
+    if ($target && $message)
+    {
+        $self->queue_msg("PRIVMSG $target :$message");
+    }
+}
+
 sub _on_ping
 {
     my ($self, $args) = @_;
@@ -87,7 +97,7 @@ sub _on_privmsg
         if ($self->{_callbacks}{on_privmsg})
         {
             foreach ($self->{_callbacks}{on_privmsg})
-                { $_->($self, $args); }
+                { warn Dumper($_->[0]); $_->[0]->($self, $args); }
         }
     }
 }
@@ -191,14 +201,15 @@ sub connect {
                                 Type => SOCK_STREAM, 
                                 PeerAddr => $self->{_settings}->{servers}->[0],
                                 PeerPort => $self->{_settings}->{port},
-                                Blocking => 1)
-                                or goto fail;
+                                Blocking => 1);
+    if ($!)
+    {
+        $self->log_line("[ERROR] Can't connect to $self->{_settings}->{servers}->[0]!");
+        return 0;
+    }
+    
     $self->{_connected} = 1;
     return 1;
-
-    fail:
-    $self->log_line("[ERROR] Can't connect to $self->{_settings}->{servers}->[0]! $!");
-    return 0;
 }
 
 sub _send

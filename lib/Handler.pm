@@ -11,7 +11,7 @@ sub load_module
 	
 	$file =~ s{::}{}g;
 	$file =~ s{/}{}g;
-	eval { require "Plugins/" . $file . ".pl"; };
+	eval { require "lib/$file/$file.pm"; };
 	if ($@) { print $@; return 0; }
 	
 	push(@{$bot->{_plugins}}, $file);
