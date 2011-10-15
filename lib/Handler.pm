@@ -43,4 +43,30 @@ sub unload_module
 	
 	return 1;
 }
+
+sub unload_all_modules
+{
+    my $bot = $_[0];
+    my $i = 0;
+    return unless $bot;
+
+    print "Unloading all modules...\n";
+    foreach (@{$bot->{_plugins}})
+    {
+        my $mod = $_;
+        print "Unloading $mod...";
+        if (unload_module($bot, $mod))
+        {
+            print " FAIL!\n";
+        }
+        else
+        {
+            $i++;
+            print " SUCCESS!\n";
+        }
+    }
+
+        return 1;
+}
+
 1;

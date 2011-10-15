@@ -4,6 +4,8 @@ use Data::Dumper;
 use JSON;
 use utf8;
 
+$SIG{INT} = \&sig_int;
+
 # Load settings
 my $json = '';
 my $settings = undef;
@@ -23,3 +25,8 @@ while ($client->is_running())
 	my $i = $client->tick();
 	last if ($i == -1);
 };
+
+sub sig_int
+{
+    $client->quit("Recieved SIGINT!");
+}

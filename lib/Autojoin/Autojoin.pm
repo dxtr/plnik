@@ -1,4 +1,6 @@
 package Autojoin;
+use strict;
+use warnings;
 use Data::Dumper;
 
 sub autojoin
@@ -19,7 +21,7 @@ sub _init
     my $aj = \&autojoin;
 	if ($bot && $aj)
 	{
-        $bot->add_callback("on_connected", $aj);
+        $bot->add_callback("on_connected", \&autojoin);
 		return 1;
 	}
     warn Dumper($aj);

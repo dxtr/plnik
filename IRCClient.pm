@@ -61,10 +61,10 @@ sub is_running
 
 sub quit
 {
-    my ($self, $reason) = @_;
+    my ($self, $reason) = ($_[0], $_[1]);
     if (!$reason) { $reason = "I'm outta here"; }
 
-    $self->disconnect();
+    $self->disconnect($reason);
     $self->{running} = 0;
 }
 
@@ -328,6 +328,8 @@ sub tick {
     my @tmp_lines = undef;
     my $line = undef;
     my $irc_message = undef;
+
+    return 0 unless $self->is_running();
 
     if ($self->{_connected})
     {

@@ -34,6 +34,7 @@ sub save_itable
 {
     my $itable = $_[0];
     return 0 unless $itable;
+    print "Saving index table....";
     my $fh;
     my $buffer = JSON->new->utf8->pretty([1])->encode($itable);
     return 0 unless $buffer;
@@ -45,6 +46,7 @@ sub save_itable
 
     print $fh $buffer;
     close $fh;
+    print "Done!\n";
     return 1;
 }
 
@@ -150,6 +152,7 @@ sub _init
 
 sub _uninit
 {
+    $bot->_send("PRIVMSG #troll :GOODBYE CRUEL WORLD!");
     save_itable();
 }
 

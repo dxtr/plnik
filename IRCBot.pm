@@ -37,13 +37,12 @@ sub new
 
 sub quit
 {
-    my ($self, $reason) = @_;
+    my ($self, $reason) = ($_[0], $_[1]);
 
     # First kill all the plugins gracefully
-    foreach ($self->{_plugins})
-    {
-        Handler::unload_module($self, $_);
-    }
+    Handler::unload_all_modules($self);
+
+    $self->SUPER::quit($reason);
 }
 
 sub add_callback
