@@ -96,8 +96,8 @@ sub _on_privmsg
         $self->log_line("[$args->{event}] $args->{source} -> $args->{target}: $args->{message}");
         if ($self->{_callbacks}{on_privmsg})
         {
-            foreach ($self->{_callbacks}{on_privmsg})
-                { warn Dumper($_->[0]); $_->[0]->($self, $args); }
+            foreach (@{$self->{_callbacks}->{on_privmsg}})
+                { $_->($self, $args); }
         }
     }
 }
@@ -116,18 +116,18 @@ sub _on_notice
     my ($self, $args) = @_;
     if (%{$args})
     {
-        if (!$args->{'text'})
+        if (!$args->{source})
         {
-            $self->log_line("[$args->{'event'}] $args->{'source'} -> $args->{'target'}");
+            $self->log_line("[$args->{event}] $args->{target}: $args->{message}");
         }
         else
         {
-            $self->log_line("[$args->{'event'}] $args->{'source'} -> $args->{'target'}: $args->{'text'}");
+            $self->log_line("[$args->{event}] $args->{source} -> $args->{target}: $args->{message}");
         }
 
         if ($self->{_callbacks}{on_notice})
         {
-            foreach ($self->{_callbacks}{on_notice})
+            foreach (@{$self->{_callbacks}->{on_notice}})
                 { $_->($self, $args); }
         }
     }
@@ -140,7 +140,7 @@ sub _on_connected
         $self->log_line("[CONNECTED] $args->{source}");
         if ($self->{_callbacks}->{on_connected})
         {
-            print "Found an on_connected callback...\n";
+            $self->log_line("Found an on_connected callback...");
             foreach (@{$self->{_callbacks}->{on_connected}})
             {
                 $_->($self, $args);
@@ -226,7 +226,6 @@ sub queue_msg
     my ($self, $msg) = @_;
 
     push(@{$self->{_send_queue}}, $msg);
-    warn Dumper($self->{_send_queue});
 }
 
 sub is_connected
@@ -329,7 +328,6 @@ sub tick {
             if ($self->{_wait_until} <= time() && @{$self->{_send_queue}})
             {
                 my $sendmsg = pop(@{$self->{_send_queue}});
-                warn Dumper($sendmsg);
                 $self->_send($sendmsg);
                 $self->{_wait_until} = time()+2;
             }

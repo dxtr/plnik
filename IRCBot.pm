@@ -45,7 +45,6 @@ sub new
     bless($self, $class);
 
     #$self->add_callback('on_connected', \&_on_connected);
-    #warn Dumper($self->{_callbacks});
         # IRCClient::add_callback($self->{_client},'on_join', \&_on_join);
 #$self->{_client}->add_callback('on_nick_change', \&_on_nick_change);
 #    $self->{_client}->add_callback('on_notice', \&_on_notice);
@@ -76,7 +75,6 @@ sub new
 sub add_callback
 {
     my ($self, $event, $cb) = @_;
-    warn Dumper(@_);
     die unless $self->SUPER::add_callback($event, $cb);
 }
 
@@ -90,8 +88,8 @@ sub join
 
 sub privmsg
 {
-    my ($self, $target, $message);
-    $self->SUPER::primsg($target, $message);
+    my ($self, $target, $message) = @_;
+    $self->SUPER::privmsg($target, $message);
 }
 
 1;
