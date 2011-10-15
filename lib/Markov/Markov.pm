@@ -70,8 +70,8 @@ sub generate_index_table
 
 sub return_weighted_char
 {
-    my ($char) = @_;
-    return 0 unless @array;
+    my $char = $_[0];
+    return 0 unless $char;
 
     my $sum = 0;
     foreach (keys $char) { $sum += $char->{$_}; }
@@ -89,18 +89,19 @@ sub return_weighted_char
 
 sub generate_markov_text
 {
-    my ($itable, $length) = @_;
+    my $itable = $_[0];
     return 0 unless $itable;
     my @itable_elements = keys %$itable;
-    return 0 unless $num_elements;
+    return 0 unless @itable_elements;
 
-    my $char = $itable_elements[int(rand(@itable_elements))];
+    my $char = $itable_elements[rand @itable_elements];
     my $text = "$char ";
 
     for ($i = 0; length($text) < 450; $i++)
     {
-        # Give it a 50% chance to stop after five words
-        last if ($i > 5 && rand(10) > 5);
+        warn Dumper($text);
+        # Give it a 50% chance to stop after ten words
+        last if ($i > 10 && rand(10) > 5);
 
         $new_char = return_weighted_char($itable->{$char});
         
@@ -121,12 +122,13 @@ sub generate_markov_text
 sub worker
 {
     my ($bot, $args) = @_;
-    return unless $bot && $args;
+    return unless $bot && $args && $args->{target} =~ m/^#/;
     my $itable = generate_index_table($args->{message}, $global_itable);
     if ($itable) { $global_itable = $itable; }
 
-    my $msg = generate_markov_text();
-    $bot->privmsg($args->{source}, $message) if $msg;
+    my $msg = generate_markov_text($global_itable);
+    warn Dumper($msg);
+    $bot->privmsg($args->{target}, $msg) if $msg;
 
     if ($next_save < time())
     {
@@ -138,9 +140,8 @@ sub worker
 sub _init
 {
     my $bot = $_[1];
-	print "Hello form Markov!";
 
-    load_itable();
+    $global_itable = load_itable();
     $next_save = time()+1800; # Don't save for 30 minutes... at least
 
     my $worker_reference = \&worker;
@@ -149,7 +150,6 @@ sub _init
 
 sub _uninit
 {
-	print "Goodbye from Markov :(";
     save_itable();
 }
 

@@ -53,6 +53,21 @@ sub new
     return $self;
 }
 
+sub is_running
+{
+    my ($self) = @_;
+    return $self->{running};
+}
+
+sub quit
+{
+    my ($self, $reason) = @_;
+    if (!$reason) { $reason = "I'm outta here"; }
+
+    $self->disconnect();
+    $self->{running} = 0;
+}
+
 # Stuff to make things work
 sub join
 {
@@ -212,11 +227,20 @@ sub connect {
     return 1;
 }
 
+sub disconnect
+{
+    my ($self, $reason) = @_;
+    if (!$reason) { $reason = "I'm outta here"; }
+
+    $self->_send("QUIT :$reason");
+    close ($self->{_socket});
+}
+
 sub _send
 {
     my ($self, $line) = @_;
     return unless $line;
-    $self->log_line("SENT: $line");
+    $self->log_line("[SENT] $line");
     #print $self->{_socket} $line;
     $self->{_socket}->send($line . "\r\n");
 }

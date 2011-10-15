@@ -6,6 +6,8 @@ use lib::Handler;
 use utf8;
 use Data::Dumper;
 
+
+
 our @ISA = ("IRCClient");
 
 sub new
@@ -31,6 +33,17 @@ sub new
     }
     
     return $self;
+}
+
+sub quit
+{
+    my ($self, $reason) = @_;
+
+    # First kill all the plugins gracefully
+    foreach ($self->{_plugins})
+    {
+        Handler::unload_module($self, $_);
+    }
 }
 
 sub add_callback

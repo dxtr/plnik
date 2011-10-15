@@ -18,7 +18,7 @@ $settings = JSON::decode_json($json);
 # Create the bot
 my $client = IRCBot->new($settings);
 
-while (1)
+while ($client->is_running())
 {
 	my $i = $client->tick();
 	last if ($i == -1);

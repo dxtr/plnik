@@ -27,7 +27,7 @@ sub unload_module
 	my $index = grep { $array[$_] =~ /$module/} 0..$#{$bot->{_plugins}};
 	return 0 unless $file && $index;
 	
-	if ($mod =~ /::/ or $mod !~ /pl$/)
+	if ($mod =~ /::/ or $mod !~ /pm$/)
 	{
 		return 0;
 	}
@@ -38,7 +38,7 @@ sub unload_module
 	}
 	
 	$module->_uninit($bot);
-	delete ${$bot->{_plugins}}[0];
+	delete ${$bot->{_plugins}}[$index];
 	delete $INC{$file};
 	
 	return 1;
