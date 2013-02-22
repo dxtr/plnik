@@ -28,5 +28,5 @@ while ($client->is_running())
 
 sub sig_int
 {
-    $client->quit("Recieved SIGINT!");
+	$client->quit("Recieved SIGINT!");
 }
